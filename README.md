@@ -2,8 +2,10 @@
 
 This repository contains my personal performance goals.
 
-Each year's goals can
-be found in a file named `fyYYY.md`.
+## List of Goals ##
+
+- [Fiscal Year 2023](fy2023.md)
+- [Fiscal Year 2024](fy2024.md)
 
 ## Contributing ##
 
