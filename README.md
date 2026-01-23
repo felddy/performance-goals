@@ -6,6 +6,8 @@ This repository contains my personal performance goals.
 
 - [Fiscal Year 2023](fy2023.md)
 - [Fiscal Year 2024](fy2024.md)
+- Fiscal Year 2025 - Did you try turning it off and on again?
+- [Fiscal Year 2026](fy2026.md)
 
 ## Contributing ##
 
