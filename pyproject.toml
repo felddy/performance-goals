@@ -1,0 +1,30 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools", "wheel"]
+
+[project]
+authors = [{ name = "Mark Feldhousen", email = "markf@geekpad.com" }]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Other Environment",
+    "Intended Audience :: Information Technology",
+    "License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication",
+    "Natural Language :: English",
+    "Topic :: Documentation",
+]
+dependencies = ["semver"]
+description = "Personal Performance Goals"
+dynamic = ["version"]
+keywords = ["goals", "performance"]
+license = { file = "LICENSE" }
+name = "performance-goals"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.urls]
+homepage = "https://github.com/felddy"
+issues = "https://github.com/felddy/performance-goals/issues"
+source = "https://github.com/felddy/performance-goals"
+
+[project.optional-dependencies]
+test = ["pre-commit"]

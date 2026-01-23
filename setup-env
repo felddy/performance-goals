@@ -11,19 +11,24 @@ Configure a development environment for this repository.
 It does the following:
   - Allows the user to specify the Python version to use for the virtual environment.
   - Allows the user to specify a name for the virtual environment.
+  - Allows the user to specify the Python version to use for the virtual environment.
+  - Allows the user to specify a name for the virtual environment.
   - Verifies pyenv and pyenv-virtualenv are installed.
   - Creates the Python virtual environment.
-  - Configures the activation of the virtual enviroment for the repo directory.
+  - Creates a Node.js virtual environment.
+  - Configures the activation of the virtual environment for the repo directory.
   - Installs the requirements needed for development.
   - Installs git pre-commit hooks.
+  - Configures git remotes for upstream "lineage" repositories.
   - Configures git remotes for upstream "lineage" repositories.
 
 Usage:
   setup-env [--venv-name venv_name] [--python-version python_version]
+  setup-env [--venv-name venv_name] [--python-version python_version]
   setup-env (-h | --help)
 
 Options:
-  -f | --force             Delete virtual enviroment if it already exists.
+  -f | --force             Delete virtual environment if it already exists.
   -h | --help              Show this message.
   -i | --install-hooks     Install hook environments for all environments in the
                            pre-commit config file.
@@ -74,8 +79,7 @@ check_python_version() {
       "invalid version of Python."
     exit 1
   # Else if the Python version isn't installed then notify the user.
-  # grep -E is used for searching through text lines that match the
-  # specific version.
+  # grep -E is used for searching through text lines that match the specific verison.
   elif ! python_versions | grep -E "^${version}$" > /dev/null; then
     echo "Error: Python version $version is not installed."
     echo "Installed Python versions are:"
@@ -94,6 +98,11 @@ INSTALL_HOOKS=0
 LIST_VERSIONS=0
 PYTHON_VERSION=""
 VENV_NAME=""
+# Initialize the other flags
+INSTALL_HOOKS=0
+LIST_VERSIONS=0
+PYTHON_VERSION=""
+VENV_NAME=""
 
 # Define long options
 LONGOPTS="force,help,install-hooks,list-versions,python-version:,venv-name:"
@@ -101,10 +110,10 @@ LONGOPTS="force,help,install-hooks,list-versions,python-version:,venv-name:"
 # Define short options for getopt
 SHORTOPTS="fhilp:v:"
 
-# Check for GNU getopt by testing for long option support. GNU getopt supports
-# the "--test" option and will return exit code 4 while POSIX/BSD getopt does
-# not and will return exit code 0.
-if getopt --test > /dev/null 2>&1; then
+# Check for GNU getopt by matching a specific pattern ("getopt from util-linux")
+# in its version output. This approach presumes the output format remains stable.
+# Be aware that format changes could invalidate this check.
+if [[ $(getopt --version 2> /dev/null) != *"getopt from util-linux"* ]]; then
   cat << 'END_OF_LINE'
 
   Please note, this script requires GNU getopt due to its enhanced
@@ -134,6 +143,7 @@ if [ -z "$(command -v pyenv)" ] || { [ -z "$(command -v pyenv-virtualenv)" ] && 
     cat << 'END_OF_LINE'
 
   On macOS, we recommend installing brew, https://brew.sh/.  Then installation
+  On macOS, we recommend installing brew, https://brew.sh/.  Then installation
   is as simple as `brew install pyenv pyenv-virtualenv` and adding this to your
   profile:
 
@@ -144,6 +154,7 @@ END_OF_LINE
 
   fi
   cat << 'END_OF_LINE'
+  For Linux, Windows Subsystem for Linux (WSL), or macOS (if you don't want
   For Linux, Windows Subsystem for Linux (WSL), or macOS (if you don't want
   to use "brew") you can use https://github.com/pyenv/pyenv-installer to install
   the necessary tools. Before running this ensure that you have installed the
@@ -210,13 +221,73 @@ while true; do
   esac
 done
 
+# Use GNU getopt to parse options
+if ! PARSED=$(getopt --options $SHORTOPTS --longoptions $LONGOPTS --name "$0" -- "$@"); then
+  echo "Error parsing options"
+  exit 1
+fi
+eval set -- "$PARSED"
+
+while true; do
+  case "$1" in
+    -f | --force)
+      FORCE=1
+      shift
+      ;;
+    -h | --help)
+      echo "$USAGE"
+      exit 0
+      ;;
+    -i | --install-hooks)
+      INSTALL_HOOKS=1
+      shift
+      ;;
+    -l | --list-versions)
+      LIST_VERSIONS=1
+      shift
+      ;;
+    -p | --python-version)
+      PYTHON_VERSION="$2"
+      shift 2
+      # Check the Python version being passed in.
+      check_python_version "$PYTHON_VERSION"
+      ;;
+    -v | --venv-name)
+      VENV_NAME="$2"
+      shift 2
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      # Unreachable due to GNU getopt handling all options
+      echo "Programming error"
+      exit 64
+      ;;
+  esac
+done
+
 # Determine the virtual environment name
 if [ -n "$VENV_NAME" ]; then
+if [ -n "$VENV_NAME" ]; then
   # Use the user-provided environment name
+  env_name="$VENV_NAME"
   env_name="$VENV_NAME"
 else
   # Set the environment name to the last part of the working directory.
   env_name=${PWD##*/}
+fi
+
+# List Python versions and select one interactively.
+if [ $LIST_VERSIONS -ne 0 ]; then
+  echo Available Python versions:
+  python_versions
+  # Read the user's desired Python version.
+  # -r: treat backslashes as literal, -p: display prompt before input.
+  read -r -p "Enter the desired Python version: " PYTHON_VERSION
+  # Check the Python version being passed in.
+  check_python_version "$PYTHON_VERSION"
 fi
 
 # List Python versions and select one interactively.
@@ -238,6 +309,7 @@ elif [[ -f .python-version ]]; then
   cat << 'END_OF_LINE'
   An existing .python-version file was found.  Either remove this file yourself
   or re-run with the --force option to have it deleted along with the associated
+  or re-run with the --force option to have it deleted along with the associated
   virtual environment.
 
   rm .python-version
@@ -256,8 +328,18 @@ fi
 #
 # shellcheck disable=SC2086
 if ! pyenv virtualenv ${PYTHON_VERSION:=} "${env_name}"; then
+#
+# If $PYTHON_VERSION is undefined then the current pyenv Python version will be used.
+#
+# We can't quote ${PYTHON_VERSION:=} below since if the variable is
+# undefined then we want nothing to appear; this is the reason for the
+# "shellcheck disable" line below.
+#
+# shellcheck disable=SC2086
+if ! pyenv virtualenv ${PYTHON_VERSION:=} "${env_name}"; then
   cat << END_OF_LINE
   An existing virtual environment named $env_name was found.  Either delete this
+  environment yourself or re-run with the --force option to have it deleted.
   environment yourself or re-run with the --force option to have it deleted.
 
   pyenv virtualenv-delete ${env_name}
@@ -281,8 +363,17 @@ for req_file in "requirements-dev.txt" "requirements-test.txt" "requirements.txt
   fi
 done
 
+# Install all necessary mypy type stubs
+# mypy --install-types src/
+
 # Install git pre-commit hooks now or later.
 pre-commit install ${INSTALL_HOOKS:+"--install-hooks"}
+
+# Create Node.js virtual environment within the Python virtual environment.
+# nodeenv --python-virtualenv
+
+# Install project node dependencies.
+# npm install
 
 # Setup git remotes from lineage configuration
 # This could fail if the remotes are already setup, but that is ok.
